@@ -168,4 +168,28 @@ mod tests {
         assert_eq!(ceil_char_boundary(text, 2), 5);
         assert_eq!(ceil_char_boundary(text, 4), 5);
     }
+
+    #[test]
+    #[allow(clippy::reversed_empty_ranges)]
+    fn clamp_range_handles_out_of_bounds_and_reversed() {
+        let text = "a😀b";
+        // Range entirely beyond text — both ends clamp to text.len().
+        assert_eq!(clamp_range(text, &(100..200)), text.len()..text.len());
+        // Range partially beyond text.
+        assert_eq!(clamp_range(text, &(0..999)), 0..text.len());
+        // Reversed range — clamp_range floors both ends independently.
+        // 4 is mid-emoji, floors to 1. 2 is mid-emoji, floors to 1.
+        let r = clamp_range(text, &(4..2));
+        assert_eq!(r, 1..1);
+    }
+
+    #[test]
+    fn utf16_range_to_utf8_with_out_of_bounds_offsets() {
+        let text = "a😀b"; // 6 bytes, 4 UTF-16 code units
+                           // Both offsets beyond text — clamps to text.len().
+        assert_eq!(utf16_range_to_utf8(text, 10..20), text.len()..text.len());
+        // Start within, end beyond.
+        let r = utf16_range_to_utf8(text, 1..10);
+        assert_eq!(r, 1..text.len());
+    }
 }

@@ -253,3 +253,93 @@ fn ime_mark_with_non_ascii_composition(cx: &mut TestAppContext) {
         .unwrap();
     assert_eq!(text, "你好", "committed CJK composition survives unmark");
 }
+
+#[gpui::test]
+#[allow(clippy::reversed_empty_ranges)]
+fn text_for_range_with_out_of_bounds_utf16_does_not_panic(cx: &mut TestAppContext) {
+    // Regression test for Bug 0001: `text_for_range` must not panic when the
+    // platform passes a stale/out-of-bounds UTF-16 range (common during IME
+    // composition after the text buffer has been modified).
+    let window = single_line(cx);
+    window
+        .update(cx, |input, window, cx| {
+            input.replace_text_in_range(None, "hello", window, cx);
+        })
+        .unwrap();
+
+    // Request a range far beyond the text length.
+    let result = window
+        .update(cx, |input, window, cx| {
+            let mut actual = None;
+            let text = input.text_for_range(0..999, &mut actual, window, cx);
+            (text, actual)
+        })
+        .unwrap();
+    assert_eq!(
+        result.0.as_deref(),
+        Some("hello"),
+        "out-of-bounds range clamps to text"
+    );
+    assert!(result.1.is_some(), "actual_range is populated");
+
+    // Request a reversed range (start > end).
+    let result = window
+        .update(cx, |input, window, cx| {
+            let mut actual = None;
+            let text = input.text_for_range(4..1, &mut actual, window, cx);
+            (text, actual)
+        })
+        .unwrap();
+    let text = result.0.as_deref().unwrap_or("");
+    assert!(
+        text == "ell" || text == "el",
+        "reversed range returns text between the two offsets, got {text:?}"
+    );
+
+    // Request a range that starts beyond text length.
+    let result = window
+        .update(cx, |input, window, cx| {
+            let mut actual = None;
+            let text = input.text_for_range(100..200, &mut actual, window, cx);
+            (text, actual)
+        })
+        .unwrap();
+    assert_eq!(
+        result.0.as_deref(),
+        Some(""),
+        "range entirely beyond text returns empty"
+    );
+}
+
+#[gpui::test]
+fn text_for_range_after_ime_shrinks_text(cx: &mut TestAppContext) {
+    // Simulate the IME scenario: text grows during composition, then the
+    // platform asks for a range based on the old (longer) text.
+    let window = single_line(cx);
+    window
+        .update(cx, |input, window, cx| {
+            // Start with long text.
+            input.replace_text_in_range(None, "hello world", window, cx);
+        })
+        .unwrap();
+    // Shrink the text.
+    window
+        .update(cx, |input, window, cx| {
+            input.select_all(&SelectAll, window, cx);
+            input.replace_text_in_range(None, "hi", window, cx);
+        })
+        .unwrap();
+    // Now request the old range (0..11) against the new short text ("hi", len 2).
+    // This would have panicked before the fix.
+    let result = window
+        .update(cx, |input, window, cx| {
+            let mut actual = None;
+            input.text_for_range(0..11, &mut actual, window, cx)
+        })
+        .unwrap();
+    assert_eq!(
+        result.as_deref(),
+        Some("hi"),
+        "stale range after shrink clamps to current text"
+    );
+}

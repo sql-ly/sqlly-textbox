@@ -765,9 +765,21 @@ impl EntityInputHandler for TextBox {
         _cx: &mut Context<Self>,
     ) -> Option<String> {
         let range = self.state.utf16_range_to_utf8(&range_utf16);
-        let utf16 = self.state.utf8_range_to_utf16(range.clone());
+        let text = self.state.text();
+        // Clamp both endpoints to valid char boundaries and text length.
+        // The IME/platform may pass stale or out-of-bounds UTF-16 ranges after
+        // the text buffer has been modified; without clamping, `text[range]`
+        // would panic.
+        let clamped = crate::utf::clamp_range(text, &range);
+        // Handle reversed ranges (start > end) by swapping so the slice is valid.
+        let (start, end) = if clamped.start <= clamped.end {
+            (clamped.start, clamped.end)
+        } else {
+            (clamped.end, clamped.start)
+        };
+        let utf16 = self.state.utf8_range_to_utf16(start..end);
         actual_range.replace(utf16);
-        Some(self.state.text()[range].to_string())
+        Some(text[start..end].to_string())
     }
 
     fn selected_text_range(

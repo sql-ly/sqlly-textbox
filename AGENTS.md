@@ -11,8 +11,8 @@ to the leaves (entity + element).
 ```bash
 cargo check --all-targets         # lib + example + tests
 cargo clippy --all-targets -- -D warnings  # zero warnings
-cargo test --lib                  # 56 unit tests for state, selection, utf, validation, history
-cargo test --test text_box_gpui   # 10 GPUI integration tests
+cargo test --lib                  # 58 unit tests for state, selection, utf, validation, history
+cargo test --test text_box_gpui   # 12 GPUI integration tests
 cargo run --example demo          # tabbed feature showcase (Basics, Multi-line, …)
 ```
 
@@ -35,6 +35,7 @@ cargo run --example demo          # tabbed feature showcase (Basics, Multi-line,
 | All byte offsets are UTF-8. | Fast mutation; canonical. |
 | UTF-16 conversion only at the EntityInputHandler boundary. | GPUI is UTF-16. |
 | All `replace_range` callers clamp their arguments to char boundaries. | Avoid `text[range]` panics. |
+| `text_for_range` clamps via `clamp_range` and handles reversed ranges. | Stale/out-of-bounds UTF-16 ranges from IME must not panic (Bug 0001). |
 | `set_selection_range` / `select_to` clamp via `clamp_offset`. | Prevent mid-codepoint panics from stale offsets. |
 | `selected_text` floors both range ends to char boundaries. | Defense-in-depth for public API misuse. |
 | `replace_range_silent` computes mark range from normalized text. | IME mark spans the normalized, not raw, composition. |

@@ -291,8 +291,8 @@ The pure `TextBoxState` is unit-tested without GPUI. The GPUI-side
 ## Testing
 
 ```bash
-cargo test --lib                  # 56 unit tests: state, selection, utf, validation, history
-cargo test --test text_box_gpui   # 10 GPUI integration tests: input handler, clipboard, validation
+cargo test --lib                  # 58 unit tests: state, selection, utf, validation, history
+cargo test --test text_box_gpui   # 12 GPUI integration tests: input handler, clipboard, validation
 cargo check --all-targets         # lib + example + tests all compile
 cargo clippy --all-targets -- -D warnings  # zero warnings
 cargo run --example demo          # open the demo window
