@@ -47,7 +47,7 @@ pub struct TextBoxState {
     coalesce_caret: Option<usize>,
     /// Monotonically increasing counter incremented after every mutation.
     /// Used by the renderer to invalidate cached layout.
-    pub version: u64,
+    version: u64,
 }
 
 impl TextBoxState {

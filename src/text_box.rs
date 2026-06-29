@@ -132,6 +132,7 @@ pub struct TextBox {
 }
 
 impl TextBox {
+    #[must_use]
     pub fn new(cx: &mut Context<Self>) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
@@ -151,6 +152,7 @@ impl TextBox {
         }
     }
 
+    #[must_use]
     pub fn multi_line(min_lines: usize, cx: &mut Context<Self>) -> Self {
         let mut s = Self::new(cx);
         s.state.set_mode(Mode::MultiLine {
@@ -163,6 +165,7 @@ impl TextBox {
 
     // -------------------- Builder methods --------------------
 
+    #[must_use]
     pub fn value(mut self, text: impl Into<String>) -> Self {
         self.state.set_text(text);
         // Keep validation consistent regardless of builder order: if a sync
@@ -171,31 +174,37 @@ impl TextBox {
         self
     }
 
+    #[must_use]
     pub fn placeholder(mut self, text: impl Into<gpui::SharedString>) -> Self {
         self.placeholder = text.into();
         self
     }
 
+    #[must_use]
     pub fn mode(mut self, mode: Mode) -> Self {
         self.state.set_mode(mode);
         self
     }
 
+    #[must_use]
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.state.set_disabled(disabled);
         self
     }
 
+    #[must_use]
     pub fn read_only(mut self, read_only: bool) -> Self {
         self.state.set_read_only(read_only);
         self
     }
 
+    #[must_use]
     pub fn password(mut self, password: bool) -> Self {
         self.state.set_password(password);
         self
     }
 
+    #[must_use]
     pub fn style(mut self, style: ComponentStyle) -> Self {
         self.style = style;
         self
@@ -206,21 +215,25 @@ impl TextBox {
         &self.style
     }
 
+    #[must_use]
     pub fn on_change(mut self, callback: ChangeCallback) -> Self {
         self.on_change = Some(callback);
         self
     }
 
+    #[must_use]
     pub fn on_commit(mut self, callback: CommitCallback) -> Self {
         self.on_commit = Some(callback);
         self
     }
 
+    #[must_use]
     pub fn validation_state(mut self, state: ValidationState) -> Self {
         self.state.set_validation(state);
         self
     }
 
+    #[must_use]
     pub fn validator(mut self, validator: crate::validation::SyncValidator) -> Self {
         let v_state = validator(self.state.text());
         self.state.set_validation(v_state);
@@ -228,12 +241,14 @@ impl TextBox {
         self
     }
 
+    #[must_use]
     pub fn async_validator(mut self, validator: AsyncValidator) -> Self {
         self.async_validator = Some(validator);
         self
     }
 
-    pub fn set_debounce_ms(mut self, ms: u64) -> Self {
+    #[must_use]
+    pub fn debounce_ms(mut self, ms: u64) -> Self {
         self.debounce_ms = ms;
         self
     }

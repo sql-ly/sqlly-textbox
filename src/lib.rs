@@ -1,14 +1,17 @@
+#![forbid(unsafe_code)]
+
 //! `sqlly-textbox` — a reusable, full-featured text input component for [GPUI].
 //!
 //! The crate exposes a [`TextBox`] entity with single-line and multi-line
 //! modes, focus states, clipboard/undo/redo, IME support, validation state,
 //! and a default key map. The component is built on top of a pure, GPUI-free
-//! [`state::TextBoxState`] so the editing model can be unit-tested without
+//! [`TextBoxState`] so the editing model can be unit-tested without
 //! opening a window.
 //!
 //! ## Quick start
 //!
 //! ```ignore
+//! use std::sync::Arc;
 //! use sqlly_textbox::{TextBox, install_text_box_keybindings};
 //!
 //! install_text_box_keybindings(cx);
@@ -42,15 +45,15 @@
 //!
 //! [GPUI]: https://github.com/zed-industries/zed/tree/main/crates/gpui
 
-pub mod actions;
-pub mod history;
-pub mod mode;
-pub mod selection;
-pub mod state;
-pub mod text_box;
-pub mod text_box_element;
-pub mod utf;
-pub mod validation;
+mod actions;
+mod history;
+mod mode;
+mod selection;
+mod state;
+mod text_box;
+mod text_box_element;
+mod utf;
+mod validation;
 
 pub use actions::install_text_box_keybindings;
 /// Re-exported to expose the full set of editing actions at the crate root.
@@ -65,5 +68,4 @@ pub use selection::{Movement, Selection};
 pub use state::TextBoxState;
 pub use text_box::TextBox;
 pub use text_box::{AsyncValidator, ChangeCallback, CommitCallback, ComponentStyle};
-pub use text_box_element::LastLayout;
 pub use validation::{sync_validator, SyncValidator, ValidationState};

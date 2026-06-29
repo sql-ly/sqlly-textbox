@@ -237,12 +237,12 @@ impl Demo {
             },
             Example {
                 label: "Async + debounced (400ms)",
-                code: "TextBox::new(cx).placeholder(\"pick a username\")\n  .async_validator(av).set_debounce_ms(400)",
+                code: "TextBox::new(cx).placeholder(\"pick a username\")\n  .async_validator(av).debounce_ms(400)",
                 field: field(cx, |cx| {
                     TextBox::new(cx)
                         .placeholder("pick a username (try \"admin\")")
                         .async_validator(async_validator.clone())
-                        .set_debounce_ms(400)
+                        .debounce_ms(400)
                 }),
             },
         ];

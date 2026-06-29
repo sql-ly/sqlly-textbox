@@ -41,6 +41,7 @@ impl History {
     }
 
     /// Construct with a custom cap (minimum 1).
+    #[cfg(test)]
     pub fn with_capacity(max_entries: usize) -> Self {
         Self {
             max_entries: max_entries.max(1),
@@ -49,6 +50,7 @@ impl History {
     }
 
     /// Number of snapshots currently on the undo stack.
+    #[cfg(test)]
     pub fn undo_depth(&self) -> usize {
         self.undo_stack.len()
     }
