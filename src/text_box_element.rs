@@ -9,8 +9,8 @@ use std::ops::Range;
 
 use gpui::{
     fill, font, px, relative, size, App, Bounds, Element, ElementId, ElementInputHandler, Entity,
-    Fill, GlobalElementId, Hsla, IntoElement, LayoutId, Pixels, Point, ShapedLine, SharedString,
-    Size, Style, TextAlign, TextRun, UnderlineStyle, Window, WrappedLine,
+    GlobalElementId, Hsla, IntoElement, LayoutId, Pixels, Point, ShapedLine, SharedString, Size,
+    Style, TextAlign, TextRun, UnderlineStyle, Window, WrappedLine,
 };
 use smallvec::SmallVec;
 
@@ -18,7 +18,7 @@ use crate::mode::{Mode, TextWrap};
 use crate::TextBox;
 
 /// Layout cache produced by the element each paint and replicated back to the
-/// entity so mouse handlers and [`crate::EntityInputHandler`] can map positions.
+/// entity so mouse handlers and `EntityInputHandler` can map positions.
 #[derive(Clone)]
 pub enum LastLayout {
     /// Single-line mode. No soft wrapping.
@@ -458,12 +458,7 @@ impl Element for TextBoxElement {
         // Persist layout + scroll for mouse & IME queries.
         self.input.update(cx, |this, _cx| {
             this.scroll_offset = scroll;
-            this.record_layout(
-                bounds,
-                layout.clone(),
-                this.style_ref().padding,
-                bounds.size,
-            );
+            this.record_layout(bounds, layout.clone());
         });
     }
 }
@@ -659,10 +654,6 @@ fn build_caret_quad(
         }
     }
 }
-
-// Quiet unused-import warning when only one variant is exercised.
-#[allow(dead_code)]
-fn _use_fill(_: Fill) {}
 
 fn line_height_for(shaped: &ShapedLine) -> Pixels {
     // LineLayout exposes `ascent`/`descent` as public fields.

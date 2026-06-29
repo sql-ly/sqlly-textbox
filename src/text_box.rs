@@ -129,8 +129,6 @@ pub struct TextBox {
     /// position back to text offsets.
     pub(crate) last_layout: Option<LastLayout>,
     pub(crate) last_bounds: Option<Bounds<Pixels>>,
-    pub(crate) last_padding: Pixels,
-    pub(crate) last_size: gpui::Size<Pixels>,
 }
 
 impl TextBox {
@@ -150,11 +148,6 @@ impl TextBox {
             scroll_offset: px(0.),
             last_layout: None,
             last_bounds: None,
-            last_padding: px(0.),
-            last_size: gpui::Size {
-                width: px(0.),
-                height: px(0.),
-            },
         }
     }
 
@@ -313,17 +306,9 @@ impl TextBox {
 
     // -------------------- Helper used by element --------------------
 
-    pub(crate) fn record_layout(
-        &mut self,
-        bounds: Bounds<Pixels>,
-        layout: LastLayout,
-        padding: Pixels,
-        size: gpui::Size<Pixels>,
-    ) {
+    pub(crate) fn record_layout(&mut self, bounds: Bounds<Pixels>, layout: LastLayout) {
         self.last_bounds = Some(bounds);
         self.last_layout = Some(layout);
-        self.last_padding = padding;
-        self.last_size = size;
     }
 
     // -------------------- Action handlers --------------------
@@ -748,12 +733,6 @@ impl TextBox {
             size: bounds.size,
         }
     }
-
-    #[allow(dead_code)]
-    pub(crate) fn bump_validation_generation(&mut self) -> u64 {
-        self.validation_generation += 1;
-        self.validation_generation
-    }
 }
 
 impl Focusable for TextBox {
@@ -902,11 +881,6 @@ impl Render for TextBox {
             self.style.background_focused
         } else {
             self.style.background
-        };
-        let _text_color = if self.state.is_disabled() {
-            self.style.text_disabled
-        } else {
-            self.style.text
         };
 
         let validation_msg = match self.state.validation() {

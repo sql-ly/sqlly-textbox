@@ -2,9 +2,14 @@
 name = "sqlly-textbox"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.82"
 description = "A reusable, full-featured text input component for GPUI, supporting single-line, multi-line, validation, focus states, selection, IME, undo/redo, clipboard, and keyboard shortcuts."
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/anomalyco/sqlly-textbox"
+repository = "https://github.com/sql-ly/sqlly-textbox"
+readme = "README.md"
+keywords = ["gpui", "textbox", "text-input", "ui", "form"]
+categories = ["gui"]
+exclude = ["/.github", "/.opencode"]
 
 [dependencies]
 gpui = "0.2.2"

@@ -56,9 +56,10 @@ impl TextBoxState {
     }
 
     pub fn with_mode(mode: Mode) -> Self {
-        let mut s = Self::default();
-        s.mode = mode;
-        s
+        Self {
+            mode,
+            ..Self::default()
+        }
     }
 
     pub fn mode(&self) -> &Mode {
@@ -184,7 +185,7 @@ impl TextBoxState {
 
     /// Replace a UTF-8 byte range. When `range` is `None`, the current selection is used.
     /// When `range` is `Some`, supplied ranges are clamped to char boundaries and mode rules.
-    /// Inserted text is normalized by [`Self::normalize_text`] before being applied.
+    /// Inserted text is normalized before being applied.
     ///
     /// Single non-whitespace character insertions into a collapsed selection
     /// coalesce into the current undo step; all other edits start a new step.
@@ -277,11 +278,13 @@ impl TextBoxState {
         let text_len = self.text.len();
         let start = match (extend, self.selection.anchor()) {
             (false, _) => self.selection.head(),
-            (true, Some(anchor)) => self
-                .selection
-                .is_reversed()
-                .then_some(anchor)
-                .unwrap_or_else(|| self.selection.head().min(anchor)),
+            (true, Some(anchor)) => {
+                if self.selection.is_reversed() {
+                    anchor
+                } else {
+                    self.selection.head().min(anchor)
+                }
+            }
             (true, None) => self.selection.head(),
         };
         let start = floor_char_boundary(&self.text, start.min(text_len));
@@ -423,13 +426,23 @@ impl TextBoxState {
     }
 
     fn normalize_text(&self, text: String) -> String {
-        match self.mode {
-            Mode::SingleLine => text
-                .replace("\r\n", " ")
-                .replace('\r', " ")
-                .replace('\n', " "),
-            Mode::MultiLine { .. } => text.replace("\r\n", "\n").replace('\r', "\n"),
+        let to_space = matches!(self.mode, Mode::SingleLine);
+        let mut out = String::with_capacity(text.len());
+        let mut chars = text.chars().peekable();
+        while let Some(c) = chars.next() {
+            match c {
+                '\r' => {
+                    // Consume a following `\n` so CRLF maps to a single replacement.
+                    if chars.peek() == Some(&'\n') {
+                        chars.next();
+                    }
+                    out.push(if to_space { ' ' } else { '\n' });
+                }
+                '\n' => out.push(if to_space { ' ' } else { '\n' }),
+                other => out.push(other),
+            }
         }
+        out
     }
 
     pub fn utf16_to_utf8(&self, offset: usize) -> usize {
@@ -670,7 +683,7 @@ mod tests {
     fn marked_range_reset_on_replace() {
         let mut st = s();
         st.set_text("hello");
-        st.replace_range_silent(1..2, "u".into(), Some(2..5));
+        st.replace_range_silent(1..2, "u", Some(2..5));
         assert!(st.marked_range().is_some());
         st.insert("X");
         assert!(st.marked_range().is_none());
@@ -783,7 +796,7 @@ mod tests {
     fn clear_marked_range_keeps_text() {
         let mut st = s();
         st.set_text("hello");
-        st.replace_range_silent(1..2, "u".into(), Some(1..2));
+        st.replace_range_silent(1..2, "u", Some(1..2));
         assert!(st.marked_range().is_some());
         st.clear_marked_range();
         assert!(st.marked_range().is_none());

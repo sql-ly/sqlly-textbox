@@ -2,9 +2,10 @@
 
 use gpui::SharedString;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum Mode {
     /// Single-line input. Pasted or IME newlines are normalized to spaces.
+    #[default]
     SingleLine,
     /// Multi-line input with a configurable visible line range and optional wrapping.
     MultiLine {
@@ -14,31 +15,20 @@ pub enum Mode {
     },
 }
 
-impl Default for Mode {
-    fn default() -> Self {
-        Mode::SingleLine
-    }
-}
-
 impl Mode {
     pub fn is_multiline(&self) -> bool {
         matches!(self, Mode::MultiLine { .. })
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TextWrap {
     /// Soft wrap on whitespace/word boundary at the available width. Logical
     /// text remains unchanged.
+    #[default]
     Soft,
     /// No wrap — long lines may overflow horizontally. The element should clip.
     None,
-}
-
-impl Default for TextWrap {
-    fn default() -> Self {
-        TextWrap::Soft
-    }
 }
 
 /// Placeholder shown when the field is empty and not composing IME text.

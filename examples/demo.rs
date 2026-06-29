@@ -13,8 +13,8 @@ use gpui::{
 };
 
 use sqlly_textbox::{
-    install_text_box_keybindings, sync_validator, AsyncValidator, ComponentStyle, Mode, TextBox,
-    TextWrap, ValidationState,
+    install_text_box_keybindings, sync_validator, AsyncValidator, ChangeCallback, CommitCallback,
+    ComponentStyle, Mode, TextBox, TextWrap, ValidationState,
 };
 
 fn main() {
@@ -27,7 +27,7 @@ fn main() {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..Default::default()
             },
-            |_, cx| cx.new(|cx| Demo::new(cx)),
+            |_, cx| cx.new(Demo::new),
         )
         .unwrap();
         cx.activate(true);
@@ -90,10 +90,8 @@ struct Demo {
 impl Demo {
     fn new(cx: &mut Context<Self>) -> Self {
         // Shared callbacks.
-        let on_change: Arc<dyn Fn(&str, &mut App) + Send + Sync> =
-            Arc::new(|text, _cx| println!("[change] {text}"));
-        let on_commit: Arc<dyn Fn(&str, &mut App) + Send + Sync> =
-            Arc::new(|text, _cx| println!("[commit] {text}"));
+        let on_change: ChangeCallback = Arc::new(|text, _cx| println!("[change] {text}"));
+        let on_commit: CommitCallback = Arc::new(|text, _cx| println!("[commit] {text}"));
 
         // Sync email validator.
         let email_validator = sync_validator(|t: &str| {

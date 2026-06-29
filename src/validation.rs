@@ -2,9 +2,10 @@
 
 use std::sync::Arc;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum ValidationState {
     /// No validation has been performed or it's irrelevant for this field.
+    #[default]
     None,
     /// A debounced async validation is in flight.
     Validating,
@@ -34,12 +35,6 @@ impl ValidationState {
             ValidationState::Invalid(m) | ValidationState::Warning(m) => Some(m.as_str()),
             _ => None,
         }
-    }
-}
-
-impl Default for ValidationState {
-    fn default() -> Self {
-        ValidationState::None
     }
 }
 

@@ -140,14 +140,6 @@ impl Selection {
             self.reversed = true;
         }
     }
-
-    /// Reset the entire selection treating `head` as the new caret position and
-    /// `anchor` as the anchor (use `None` for a collapsed caret).
-    pub fn reset(&mut self, head: usize, anchor: Option<usize>, reversed: bool) {
-        self.head = head;
-        self.anchor = anchor;
-        self.reversed = reversed;
-    }
 }
 
 /// Movement units supported by selection navigation.

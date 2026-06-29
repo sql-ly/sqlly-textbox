@@ -27,7 +27,7 @@
 //!
 //! ## Feature overview
 //!
-//! - **Modes**: Single-line (default) or [multi-line](mode::MultiLine) with
+//! - **Modes**: Single-line (default) or [multi-line](Mode::MultiLine) with
 //!   configurable minimum visible lines and wrap policy.
 //! - **Editing**: Insert, delete, backspace, forward-delete, undo, redo.
 //! - **Selection**: grapheme and word movement, line/document jumps,
