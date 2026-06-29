@@ -1,0 +1,23 @@
+[package]
+name = "sqlly-textbox"
+version = "0.1.0"
+edition = "2021"
+description = "A reusable, full-featured text input component for GPUI, supporting single-line, multi-line, validation, focus states, selection, IME, undo/redo, clipboard, and keyboard shortcuts."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/anomalyco/sqlly-textbox"
+
+[dependencies]
+gpui = "0.2.2"
+unicode-segmentation = "1"
+smallvec = "1"
+
+[dev-dependencies]
+gpui = { version = "0.2.2", features = ["test-support"] }
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"
+
+[profile.dev]
+opt-level = 0
+debug = true
