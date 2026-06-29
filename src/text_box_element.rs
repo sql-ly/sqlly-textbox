@@ -213,6 +213,7 @@ impl Element for TextBoxElement {
         let min_lines = state.min_lines().max(1);
         let max_lines = state.max_lines();
         let line_height = input.style_ref().line_height;
+        let min_height = input.style_ref().min_height;
 
         // Grow with explicit logical lines (cheap, pre-shaping estimate), but
         // clamp to [min_lines, max_lines]. Soft-wrapped overflow scrolls inside
@@ -223,9 +224,12 @@ impl Element for TextBoxElement {
             rows = rows.min(max.max(min_lines));
         }
 
+        let content_height = line_height * rows as f32;
+        let height = content_height.max(min_height);
+
         let mut style = Style::default();
         style.size.width = relative(1.).into();
-        style.size.height = (line_height * rows as f32).into();
+        style.size.height = height.into();
         (window.request_layout(style, [], cx), ())
     }
 
@@ -308,7 +312,7 @@ impl Element for TextBoxElement {
                         .shape_line(display_text.clone(), font_size, &runs, None);
                 LastLayout::Single {
                     shaped,
-                    original_len: real_text.len(),
+                    original_len: display_text.len(),
                 }
             }
             Mode::MultiLine { .. } => {
@@ -345,6 +349,21 @@ impl Element for TextBoxElement {
 
         // Selection & caret.
         let sel = input.state().selection().clone();
+        // When showing a placeholder (empty text), the caret sits at offset 0
+        // of the shaped placeholder. When masked, map the caret's char index
+        // into the mask string. Otherwise use the real UTF-8 offset directly.
+        let caret_offset = if show_placeholder {
+            0
+        } else if masked {
+            // Map char index in real_text → byte offset in "•" mask string.
+            sel.head()
+                .min(real_text.len())
+                .min(real_text.char_indices().count())
+                * '•'.len_utf8()
+        } else {
+            sel.head()
+        };
+        let caret_blink_on = input.caret_blink_on;
 
         // Determine vertical scroll (multi-line) to keep the caret visible.
         let viewport_h = bounds.size.height;
@@ -367,7 +386,7 @@ impl Element for TextBoxElement {
             &layout,
             &bounds,
             &display_text,
-            sel.head(),
+            caret_offset,
             caret_color,
             line_height,
         ) {
@@ -396,14 +415,18 @@ impl Element for TextBoxElement {
             selection_color,
             line_height,
         );
-        let caret_quad = build_caret_quad(
-            &layout,
-            &scrolled_bounds,
-            &display_text,
-            sel.head(),
-            caret_color,
-            line_height,
-        );
+        let caret_quad = if caret_blink_on {
+            build_caret_quad(
+                &layout,
+                &scrolled_bounds,
+                &display_text,
+                caret_offset,
+                caret_color,
+                line_height,
+            )
+        } else {
+            None
+        };
 
         let focused = focus_handle.is_focused(window);
 
@@ -608,10 +631,14 @@ fn build_caret_quad(
                 return None;
             }
             let x = shaped.x_for_index(offset.min(text.len()));
+            // Use the actual text height (ascent + descent) rather than the
+            // full line_height, so the caret visually matches the text size.
+            let text_h = line_height_for(shaped);
+            let y_offset = (line_height - text_h) / 2.0;
             Some(fill(
                 Bounds::new(
-                    Point::new(bounds.left() + x, bounds.top()),
-                    size(px(2.0), line_height),
+                    Point::new(bounds.left() + x, bounds.top() + y_offset),
+                    size(px(2.0), text_h),
                 ),
                 color,
             ))

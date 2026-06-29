@@ -13,7 +13,7 @@ use std::sync::Arc;
 use gpui::{
     hsla, prelude::*, px, App, Bounds, ClipboardItem, Context, CursorStyle, EntityInputHandler,
     FocusHandle, Focusable, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels,
-    Point, UTF16Selection, Window,
+    Point, Task, UTF16Selection, Window,
 };
 
 use crate::actions::{
@@ -147,6 +147,10 @@ pub struct TextBox {
     /// position back to text offsets.
     pub(crate) last_layout: Option<LastLayout>,
     pub(crate) last_bounds: Option<Bounds<Pixels>>,
+    /// Toggles every ~500ms while focused to produce a blinking caret.
+    pub(crate) caret_blink_on: bool,
+    /// Active blink timer task; dropped on blur to stop blinking.
+    blink_task: Option<Task<()>>,
 }
 
 impl TextBox {
@@ -167,6 +171,8 @@ impl TextBox {
             scroll_offset: px(0.),
             last_layout: None,
             last_bounds: None,
+            caret_blink_on: true,
+            blink_task: None,
         }
     }
 
@@ -607,6 +613,8 @@ impl TextBox {
         }
         // Begin a potential drag-selection.
         self.is_selecting = event.click_count <= 1;
+        // Reset blink so the caret is immediately visible after clicking.
+        self.caret_blink_on = true;
         cx.notify();
     }
 
@@ -720,6 +728,8 @@ impl TextBox {
         if let Some(callback) = &self.on_change {
             callback(self.state.text(), cx);
         }
+        // Reset blink so the caret is immediately visible after any edit.
+        self.caret_blink_on = true;
         cx.notify();
     }
 
@@ -920,6 +930,27 @@ impl EntityInputHandler for TextBox {
 impl Render for TextBox {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let focused = self.focus_handle.is_focused(_window);
+
+        // Manage caret blink task: spawn when gaining focus, drop when losing it.
+        if focused && self.blink_task.is_none() {
+            self.caret_blink_on = true;
+            let task = cx.spawn(async move |this, cx| loop {
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(500))
+                    .await;
+                let Ok(()) = this.update(cx, |this, cx| {
+                    this.caret_blink_on = !this.caret_blink_on;
+                    cx.notify();
+                }) else {
+                    break;
+                };
+            });
+            self.blink_task = Some(task);
+            cx.notify(); // immediate repaint with caret visible
+        } else if !focused && self.blink_task.is_some() {
+            self.blink_task = None;
+            self.caret_blink_on = true;
+        }
         let border_color = if self.state.is_disabled() {
             self.style.border_disabled
         } else if focused {
