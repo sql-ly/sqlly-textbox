@@ -9,10 +9,11 @@ to the leaves (entity + element).
 ## Build & verify
 
 ```bash
-cargo check --all-targets    # lib + example + tests
-cargo test --lib             # 50 unit tests for state, selection, utf, validation, history
-cargo test                   # also runs the 9 GPUI integration tests
-cargo run --example demo     # tabbed feature showcase (Basics, Multi-line, …)
+cargo check --all-targets         # lib + example + tests
+cargo clippy --all-targets -- -D warnings  # zero warnings
+cargo test --lib                  # 56 unit tests for state, selection, utf, validation, history
+cargo test --test text_box_gpui   # 10 GPUI integration tests
+cargo run --example demo          # tabbed feature showcase (Basics, Multi-line, …)
 ```
 
 ## Layering
@@ -34,9 +35,14 @@ cargo run --example demo     # tabbed feature showcase (Basics, Multi-line, …)
 | All byte offsets are UTF-8. | Fast mutation; canonical. |
 | UTF-16 conversion only at the EntityInputHandler boundary. | GPUI is UTF-16. |
 | All `replace_range` callers clamp their arguments to char boundaries. | Avoid `text[range]` panics. |
+| `set_selection_range` / `select_to` clamp via `clamp_offset`. | Prevent mid-codepoint panics from stale offsets. |
+| `selected_text` floors both range ends to char boundaries. | Defense-in-depth for public API misuse. |
+| `replace_range_silent` computes mark range from normalized text. | IME mark spans the normalized, not raw, composition. |
+| `new_selected_range_utf16` in IME is relative to composition text. | Per GPUI EntityInputHandler contract. |
 | `set_text` replaces the text AND clears history. | Setting from outside should not re-enter undo. |
 | Validation generation token suppresses stale async results. | Prevents races where an old validator overwrites a newer edit. |
 | Password mode suppresses copy/cut but allows paste. | Standard browser-style policy; documented in README. |
+| `#![forbid(unsafe_code)]` at crate root. | No unsafe, ever. |
 
 ## Adding a feature
 

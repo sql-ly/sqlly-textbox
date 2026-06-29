@@ -191,7 +191,7 @@ TextBox::new(cx).placeholder("pick a username")
         if v == "admin" { ValidationState::Invalid("taken".into()) }
         else { ValidationState::Valid }
     })))
-    .set_debounce_ms(400);
+    .debounce_ms(400);
 ```
 
 ### Modes — password, disabled, read-only
@@ -241,7 +241,7 @@ commit behavior all work out of the box.
 | `password(true)` | Render masked glyphs; suppress copy/cut; allow paste. |
 | `validator(SyncValidator)` | Sync validator runs on every change. Build with `sync_validator(\|t\| …)`. |
 | `async_validator(Arc<Fn(String) -> Pin<Box<dyn Future<Output = ValidationState> + Send>>>)` | Debounced async validator; stale results are discarded. |
-| `set_debounce_ms(ms)` | Debounce window for async validation (default 300). |
+| `debounce_ms(ms)` | Debounce window for async validation (default 300). |
 | `validation_state(state)` | Set externally controlled validation state. |
 | `style(ComponentStyle)` | Override color palette, padding, radius, etc. |
 | `on_change(Arc<Fn(&str, &mut App)>)` | Fires after each accepted mutation. |
@@ -291,9 +291,10 @@ The pure `TextBoxState` is unit-tested without GPUI. The GPUI-side
 ## Testing
 
 ```bash
-cargo test --lib                  # 50 unit tests: state, selection, utf, validation, history
-cargo test --test text_box_gpui # 9 GPUI integration tests: input handler, clipboard, validation
+cargo test --lib                  # 56 unit tests: state, selection, utf, validation, history
+cargo test --test text_box_gpui   # 10 GPUI integration tests: input handler, clipboard, validation
 cargo check --all-targets         # lib + example + tests all compile
+cargo clippy --all-targets -- -D warnings  # zero warnings
 cargo run --example demo          # open the demo window
 ```
 
@@ -301,6 +302,10 @@ cargo run --example demo          # open the demo window
 
 - Box layout of bordered error messages: the validation message is rendered
   below the field, with `text_xs` styling.
+- `min_lines` / `max_lines` count **logical** lines (split on `\n`), not
+  visual wrapped rows. Soft-wrapped content may show more visual rows.
+- UTF-8/UTF-16 conversion and grapheme movement are O(n) — fine for
+  form-field-sized inputs but not optimized for editor-sized documents.
 - BiDi/RTL text is not explicitly supported (no tested layout paths).
 - Touch/mobile: not exercised.
 - Hard wrap (`TextWrap::Hard`) is intentionally **not** implemented because it
@@ -308,4 +313,5 @@ cargo run --example demo          # open the demo window
 
 ## License
 
-Dual-licensed under MIT or Apache-2.0 at your option.
+Dual-licensed under MIT or Apache-2.0 at your option. See `LICENSE-MIT` and
+`LICENSE-APACHE`.
