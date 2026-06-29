@@ -14,7 +14,7 @@ use gpui::{
 
 use sqlly_textbox::{
     install_text_box_keybindings, sync_validator, AsyncValidator, ChangeCallback, CommitCallback,
-    ComponentStyle, Mode, TextBox, TextWrap, ValidationState,
+    ComponentStyle, Mode, TextBox, TextWrap, ValidationState, VerticalAlign,
 };
 
 fn main() {
@@ -385,6 +385,71 @@ impl Demo {
             },
         ];
 
+        // ----- Tab 6: Alignment ------------------------------------------------
+        // Vertical alignment is only visible when the field is taller than the
+        // text content. Each example sets min_height so there is extra space to
+        // position the text at the top, middle, or bottom.
+        let align = vec![
+            Example {
+                label: "Single-line · Top",
+                code: "TextBox::new(cx).value(\"top\").vertical_align(Top).min_height(px(80))",
+                field: field(cx, |cx| {
+                    TextBox::new(cx)
+                        .value("top".to_string())
+                        .vertical_align(VerticalAlign::Top)
+                        .min_height(px(80.))
+                }),
+            },
+            Example {
+                label: "Single-line · Middle (default)",
+                code: "TextBox::new(cx).value(\"middle\").min_height(px(80))",
+                field: field(cx, |cx| {
+                    TextBox::new(cx)
+                        .value("middle".to_string())
+                        .min_height(px(80.))
+                }),
+            },
+            Example {
+                label: "Single-line · Bottom",
+                code: "TextBox::new(cx).value(\"bottom\").vertical_align(Bottom).min_height(px(80))",
+                field: field(cx, |cx| {
+                    TextBox::new(cx)
+                        .value("bottom".to_string())
+                        .vertical_align(VerticalAlign::Bottom)
+                        .min_height(px(80.))
+                }),
+            },
+            Example {
+                label: "Multi-line · Top (3 rows, min 120px)",
+                code: "TextBox::multi_line(3, cx).value(\"top\\nmiddle\\nbottom\")\n  .vertical_align(Top).min_height(px(120))",
+                field: field(cx, |cx| {
+                    TextBox::multi_line(3, cx)
+                        .value("top\nmiddle\nbottom".to_string())
+                        .vertical_align(VerticalAlign::Top)
+                        .min_height(px(120.))
+                }),
+            },
+            Example {
+                label: "Multi-line · Middle (3 rows, min 120px)",
+                code: "TextBox::multi_line(3, cx).value(\"top\\nmiddle\\nbottom\")\n  .min_height(px(120))",
+                field: field(cx, |cx| {
+                    TextBox::multi_line(3, cx)
+                        .value("top\nmiddle\nbottom".to_string())
+                        .min_height(px(120.))
+                }),
+            },
+            Example {
+                label: "Multi-line · Bottom (3 rows, min 120px)",
+                code: "TextBox::multi_line(3, cx).value(\"top\\nmiddle\\nbottom\")\n  .vertical_align(Bottom).min_height(px(120))",
+                field: field(cx, |cx| {
+                    TextBox::multi_line(3, cx)
+                        .value("top\nmiddle\nbottom".to_string())
+                        .vertical_align(VerticalAlign::Bottom)
+                        .min_height(px(120.))
+                }),
+            },
+        ];
+
         Self {
             active_tab: 0,
             tabs: vec![
@@ -412,6 +477,10 @@ impl Demo {
                     title: "Unicode & IME",
                     examples: unicode,
                 },
+                Tab {
+                    title: "Alignment",
+                    examples: align,
+                },
             ],
         }
     }
@@ -434,8 +503,9 @@ impl Demo {
             let idx = i;
             el = el.on_mouse_down(
                 MouseButton::Left,
-                cx.listener(move |this, _ev, _window, _cx| {
+                cx.listener(move |this, _ev, _window, cx| {
                     this.active_tab = idx;
+                    cx.notify();
                 }),
             );
             buttons.push(el.into_any_element());

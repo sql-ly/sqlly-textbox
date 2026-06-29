@@ -39,8 +39,18 @@ pub type AsyncValidator = Arc<
     dyn Fn(String) -> std::pin::Pin<Box<dyn Future<Output = ValidationState> + Send>> + Send + Sync,
 >;
 
-/// Builder options that don't fit the obvious builder methods.
-#[derive(Clone, Debug)]
+/// Vertical alignment of text within the field's content box.
+///
+/// Only visible when the field is taller than the text content (e.g. via
+/// `min_height` or when a parent stretches the field). Defaults to `Middle`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum VerticalAlign {
+    Top,
+    #[default]
+    Middle,
+    Bottom,
+}
+
 pub struct ComponentStyle {
     /// Background color when idle.
     pub background: gpui::Hsla,
@@ -76,6 +86,12 @@ pub struct ComponentStyle {
     pub border_width_px: f32,
     /// Inner padding.
     pub padding: Pixels,
+    /// Minimum height of the field (including padding and border).
+    /// When this exceeds the text content height, `vertical_align`
+    /// determines where the text sits. Defaults to 0 (no effect).
+    pub min_height: Pixels,
+    /// Vertical alignment of text within the field.
+    pub vertical_align: VerticalAlign,
     /// Line height.
     pub line_height: Pixels,
     /// Font size.
@@ -102,6 +118,8 @@ impl Default for ComponentStyle {
             corner_radius: px(6.),
             border_width_px: 1.0,
             padding: px(8.),
+            min_height: px(0.),
+            vertical_align: VerticalAlign::Middle,
             line_height: px(24.),
             font_size: px(14.),
         }
@@ -207,6 +225,21 @@ impl TextBox {
     #[must_use]
     pub fn style(mut self, style: ComponentStyle) -> Self {
         self.style = style;
+        self
+    }
+
+    /// Set the vertical alignment of text within the field.
+    #[must_use]
+    pub fn vertical_align(mut self, align: VerticalAlign) -> Self {
+        self.style.vertical_align = align;
+        self
+    }
+
+    /// Set a minimum height for the field. When this exceeds the text content
+    /// height, `vertical_align` controls where the text sits.
+    #[must_use]
+    pub fn min_height(mut self, height: Pixels) -> Self {
+        self.style.min_height = height;
         self
     }
 
@@ -697,21 +730,20 @@ impl TextBox {
         }
     }
 
-    fn run_async_validation(&self, cx: &mut Context<Self>) {
+    fn run_async_validation(&mut self, cx: &mut Context<Self>) {
         let Some(validator) = self.async_validator.clone() else {
             return;
         };
         let validation_generation = self.validation_generation + 1;
-        // Mutate via cx; needs access to &mut self — re-borrow method below.
-        // (We have &self; the entity update will handle mut.)
+        // Mutate directly — we already hold the entity lease via the caller
+        // (after_mutation). Going through entity.update(cx, ...) here would
+        // attempt a second lease on the same entity and panic
+        // ("cannot update TextBox while it is already being updated").
         let value = self.state.text().to_string();
         let debounce_ms = self.debounce_ms;
         let entity = cx.entity();
-        entity.update(cx, |this, cx| {
-            this.validation_generation = validation_generation;
-            this.state.set_validation(ValidationState::Validating);
-            cx.notify();
-        });
+        self.validation_generation = validation_generation;
+        self.state.set_validation(ValidationState::Validating);
         let task = cx.spawn(async move |_weak, cx| {
             cx.background_executor()
                 .timer(std::time::Duration::from_millis(debounce_ms))
@@ -919,7 +951,7 @@ impl Render for TextBox {
 
         let element = TextBoxElement::new(cx.entity());
 
-        let field = apply_border_width(
+        let mut field = apply_border_width(
             gpui::div()
                 .id(("TextBox", cx.entity().entity_id()))
                 .key_context("TextBox")
@@ -930,49 +962,66 @@ impl Render for TextBox {
             self.style.border_width_px,
         )
         .rounded(self.style.corner_radius)
-        .p(self.style.padding)
-        .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
-        .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
-        .on_mouse_move(cx.listener(Self::on_mouse_move))
-        // Editing
-        .on_action(cx.listener(Self::backspace))
-        .on_action(cx.listener(Self::delete_forward))
-        // Movement
-        .on_action(cx.listener(Self::left))
-        .on_action(cx.listener(Self::right))
-        .on_action(cx.listener(Self::up))
-        .on_action(cx.listener(Self::down))
-        .on_action(cx.listener(Self::word_left))
-        .on_action(cx.listener(Self::word_right))
-        .on_action(cx.listener(Self::line_start))
-        .on_action(cx.listener(Self::line_end))
-        .on_action(cx.listener(Self::document_start))
-        .on_action(cx.listener(Self::document_end))
-        // Select movement
-        .on_action(cx.listener(Self::select_left))
-        .on_action(cx.listener(Self::select_right))
-        .on_action(cx.listener(Self::select_up))
-        .on_action(cx.listener(Self::select_down))
-        .on_action(cx.listener(Self::select_word_left))
-        .on_action(cx.listener(Self::select_word_right))
-        .on_action(cx.listener(Self::select_line_start))
-        .on_action(cx.listener(Self::select_line_end))
-        .on_action(cx.listener(Self::select_document_start))
-        .on_action(cx.listener(Self::select_document_end))
-        // Selection
-        .on_action(cx.listener(Self::select_all))
-        // Clipboard
-        .on_action(cx.listener(Self::copy))
-        .on_action(cx.listener(Self::cut))
-        .on_action(cx.listener(Self::paste))
-        // Undo/redo
-        .on_action(cx.listener(Self::undo))
-        .on_action(cx.listener(Self::redo))
-        // IME/commit
-        .on_action(cx.listener(Self::insert_newline))
-        .on_action(cx.listener(Self::commit_action))
-        .on_action(cx.listener(Self::show_character_palette))
-        .child(element);
+        // Flex + cross-axis alignment position the text element within the
+        // field's content box. The element's height is `line_height * rows`;
+        // when the field is taller (min_height or parent stretch), the
+        // vertical_align controls where the text sits.
+        .flex()
+        .p(self.style.padding);
+
+        field = match self.style.vertical_align {
+            VerticalAlign::Top => field.items_start(),
+            VerticalAlign::Middle => field.items_center(),
+            VerticalAlign::Bottom => field.items_end(),
+        };
+
+        if self.style.min_height > px(0.) {
+            field = field.min_h(self.style.min_height);
+        }
+
+        let field = field
+            .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
+            .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
+            .on_mouse_move(cx.listener(Self::on_mouse_move))
+            // Editing
+            .on_action(cx.listener(Self::backspace))
+            .on_action(cx.listener(Self::delete_forward))
+            // Movement
+            .on_action(cx.listener(Self::left))
+            .on_action(cx.listener(Self::right))
+            .on_action(cx.listener(Self::up))
+            .on_action(cx.listener(Self::down))
+            .on_action(cx.listener(Self::word_left))
+            .on_action(cx.listener(Self::word_right))
+            .on_action(cx.listener(Self::line_start))
+            .on_action(cx.listener(Self::line_end))
+            .on_action(cx.listener(Self::document_start))
+            .on_action(cx.listener(Self::document_end))
+            // Select movement
+            .on_action(cx.listener(Self::select_left))
+            .on_action(cx.listener(Self::select_right))
+            .on_action(cx.listener(Self::select_up))
+            .on_action(cx.listener(Self::select_down))
+            .on_action(cx.listener(Self::select_word_left))
+            .on_action(cx.listener(Self::select_word_right))
+            .on_action(cx.listener(Self::select_line_start))
+            .on_action(cx.listener(Self::select_line_end))
+            .on_action(cx.listener(Self::select_document_start))
+            .on_action(cx.listener(Self::select_document_end))
+            // Selection
+            .on_action(cx.listener(Self::select_all))
+            // Clipboard
+            .on_action(cx.listener(Self::copy))
+            .on_action(cx.listener(Self::cut))
+            .on_action(cx.listener(Self::paste))
+            // Undo/redo
+            .on_action(cx.listener(Self::undo))
+            .on_action(cx.listener(Self::redo))
+            // IME/commit
+            .on_action(cx.listener(Self::insert_newline))
+            .on_action(cx.listener(Self::commit_action))
+            .on_action(cx.listener(Self::show_character_palette))
+            .child(element);
 
         if let Some((msg, color)) = validation_msg {
             gpui::div()

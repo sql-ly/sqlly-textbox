@@ -67,5 +67,5 @@ pub use mode::{Mode, Placeholder, TextWrap};
 pub use selection::{Movement, Selection};
 pub use state::TextBoxState;
 pub use text_box::TextBox;
-pub use text_box::{AsyncValidator, ChangeCallback, CommitCallback, ComponentStyle};
+pub use text_box::{AsyncValidator, ChangeCallback, CommitCallback, ComponentStyle, VerticalAlign};
 pub use validation::{sync_validator, SyncValidator, ValidationState};
