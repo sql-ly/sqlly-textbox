@@ -221,3 +221,35 @@ fn read_only_blocks_mutation_but_allows_copy(cx: &mut TestAppContext) {
         .unwrap_or_default();
     assert_eq!(clip, "readme", "read-only copy should still work");
 }
+
+#[gpui::test]
+fn ime_mark_with_non_ascii_composition(cx: &mut TestAppContext) {
+    let window = single_line(cx);
+    // Compose a CJK string with a relative selection inside it.
+    // "你好" = 6 UTF-8 bytes, 2 UTF-16 code units.
+    window
+        .update(cx, |input, window, cx| {
+            input.replace_and_mark_text_in_range(None, "你好", Some(0..1), window, cx);
+        })
+        .unwrap();
+    let (text, marked) = window
+        .update(cx, |input, window, cx| {
+            (
+                input.text().to_string(),
+                input.marked_text_range(window, cx).is_some(),
+            )
+        })
+        .unwrap();
+    assert_eq!(text, "你好");
+    assert!(marked, "composition should set marked range");
+    // Unmark (IME accepts).
+    window
+        .update(cx, |input, window, cx| {
+            input.unmark_text(window, cx);
+        })
+        .unwrap();
+    let text = window
+        .update(cx, |input, _, _| input.text().to_string())
+        .unwrap();
+    assert_eq!(text, "你好", "committed CJK composition survives unmark");
+}

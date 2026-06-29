@@ -79,11 +79,14 @@ impl TextBoxState {
     }
 
     pub fn set_selection_range(&mut self, start: usize, end: usize) {
+        let start = self.clamp_offset(start);
+        let end = self.clamp_offset(end);
         self.selection.set_range(start, end);
         self.break_coalescing();
     }
 
     pub fn select_to(&mut self, offset: usize) {
+        let offset = self.clamp_offset(offset);
         self.selection.select_to(offset);
         self.break_coalescing();
     }
@@ -229,25 +232,22 @@ impl TextBoxState {
 
     /// Replace a UTF-8 byte range without recording an undo snapshot.
     /// Used by IME composition to keep marked-text edits inside the same
-    /// coalesced history entry.
-    pub fn replace_range_silent(
-        &mut self,
-        range: Range<usize>,
-        text: &str,
-        mark: Option<Range<usize>>,
-    ) {
+    /// coalesced history entry. When `mark` is true, the inserted (normalized)
+    /// text span is recorded as the IME marked range.
+    pub fn replace_range_silent(&mut self, range: Range<usize>, text: &str, mark: bool) {
         if !self.can_edit() {
             return;
         }
         let text = self.normalize_text(text.to_string());
         let target = clamp_range(&self.text, &range);
         self.text.replace_range(target.clone(), &text);
-        self.selection.set_caret(target.start + text.len());
-        self.marked_range = mark.map(|mut r| {
-            r.start += target.start;
-            r.end += target.start;
-            clamp_range(&self.text, &r)
-        });
+        let new_caret = target.start + text.len();
+        self.selection.set_caret(new_caret);
+        self.marked_range = if mark && !text.is_empty() {
+            Some(target.start..new_caret)
+        } else {
+            None
+        };
         self.last_edit = EditKind::Other;
         self.coalesce_caret = None;
         self.version += 1;
@@ -270,6 +270,11 @@ impl TextBoxState {
     fn break_coalescing(&mut self) {
         self.last_edit = EditKind::Other;
         self.coalesce_caret = None;
+    }
+
+    /// Clamp an offset to a valid UTF-8 char boundary within the text buffer.
+    fn clamp_offset(&self, offset: usize) -> usize {
+        floor_char_boundary(&self.text, offset.min(self.text.len()))
     }
 
     /// Move the caret/selection by a movement unit. If `extend` is true the
@@ -367,12 +372,11 @@ impl TextBoxState {
         self.version += 1;
     }
 
-    /// Delete the current selection (no-op if collapsed).
+    /// Delete the current selection (no-op if collapsed or not editable).
     pub fn delete_selection(&mut self) {
-        if self.selection.is_collapsed() {
+        if self.selection.is_collapsed() || !self.can_edit() {
             return;
         }
-        let _ = self.can_edit();
         self.replace_range(None, "");
     }
 
@@ -415,10 +419,15 @@ impl TextBoxState {
 
     pub fn selected_text(&self) -> String {
         let r = self.selection.range_bounds();
-        if r.start == r.end || r.end > self.text.len() {
+        if r.start == r.end || r.start >= self.text.len() {
             return String::new();
         }
-        self.text[r].to_string()
+        let start = floor_char_boundary(&self.text, r.start.min(self.text.len()));
+        let end = floor_char_boundary(&self.text, r.end.min(self.text.len()));
+        if start >= end {
+            return String::new();
+        }
+        self.text[start..end].to_string()
     }
 
     pub fn version(&self) -> u64 {
@@ -683,7 +692,7 @@ mod tests {
     fn marked_range_reset_on_replace() {
         let mut st = s();
         st.set_text("hello");
-        st.replace_range_silent(1..2, "u", Some(2..5));
+        st.replace_range_silent(1..2, "u", true);
         assert!(st.marked_range().is_some());
         st.insert("X");
         assert!(st.marked_range().is_none());
@@ -796,7 +805,7 @@ mod tests {
     fn clear_marked_range_keeps_text() {
         let mut st = s();
         st.set_text("hello");
-        st.replace_range_silent(1..2, "u", Some(1..2));
+        st.replace_range_silent(1..2, "u", true);
         assert!(st.marked_range().is_some());
         st.clear_marked_range();
         assert!(st.marked_range().is_none());
@@ -811,5 +820,73 @@ mod tests {
         st.collapse_to(0);
         st.line_end(false);
         assert_eq!(st.selection().head(), 11);
+    }
+
+    #[test]
+    fn delete_selection_noop_when_read_only() {
+        let mut st = s();
+        st.set_text("hello");
+        st.select_all();
+        st.set_read_only(true);
+        st.delete_selection();
+        assert_eq!(st.text(), "hello", "read-only must block deletion");
+    }
+
+    #[test]
+    fn delete_selection_noop_when_disabled() {
+        let mut st = s();
+        st.set_text("hello");
+        st.select_all();
+        st.set_disabled(true);
+        st.delete_selection();
+        assert_eq!(st.text(), "hello", "disabled must block deletion");
+    }
+
+    #[test]
+    fn selection_offsets_clamp_to_utf8_boundaries() {
+        let mut st = s();
+        // "a" (1 byte) + "é" (2 bytes) + "🦀" (4 bytes) + "z" (1 byte) = 8 bytes
+        st.set_text("aé🦀z");
+        // Offset 2 is inside "é" (bytes 1-2). Clamping should floor to 1.
+        st.set_selection_range(2, 6);
+        let r = st.selection().range_bounds();
+        // Must be at char boundaries, not mid-codepoint.
+        let _ = st.text()[r.clone()].to_string(); // must not panic
+        assert!(r.start == 1 || r.start == 3, "start clamped to boundary");
+    }
+
+    #[test]
+    fn selected_text_handles_stale_range() {
+        let mut st = s();
+        st.set_text("abc");
+        // Set a selection then shrink the text so the selection is stale.
+        st.set_selection_range(0, 10);
+        let text = st.selected_text();
+        assert_eq!(text, "abc", "selected_text clamps to available text");
+    }
+
+    #[test]
+    fn selected_text_handles_mid_codepoint_range() {
+        let mut st = s();
+        st.set_text("aé🦀z");
+        // Force a range that starts mid-codepoint via set_selection_range
+        // (which should clamp), then verify selected_text doesn't panic.
+        st.set_selection_range(2, 5);
+        let _ = st.selected_text(); // must not panic
+    }
+
+    #[test]
+    fn ime_mark_range_uses_normalized_text_length() {
+        // In single-line mode, CRLF normalizes to a single space.
+        // The mark range must span the normalized text, not the raw input.
+        let mut st = s(); // SingleLine
+        st.set_text("hello");
+        st.collapse_to(5);
+        st.replace_range_silent(5..5, "a\r\nb", true);
+        let mark = st.marked_range().expect("mark should be set");
+        // "a\r\nb" normalizes to "a b" (3 bytes) in single-line mode.
+        // Mark should be 5..8, NOT 5..9 (raw "a\r\nb" is 4 bytes).
+        assert_eq!(mark.end - mark.start, 3, "mark spans normalized text");
+        assert_eq!(&st.text()[mark.clone()], "a b");
     }
 }

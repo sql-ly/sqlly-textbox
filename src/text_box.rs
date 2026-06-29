@@ -814,26 +814,21 @@ impl EntityInputHandler for TextBox {
             .unwrap_or_else(|| self.state.selection().range_bounds());
 
         self.state.snapshot_for_undo();
-        let mark = if new_text.is_empty() {
-            None
-        } else {
-            Some(target.start..target.start + new_text.len())
-        };
         self.state
-            .replace_range_silent(target.clone(), new_text, mark);
+            .replace_range_silent(target.clone(), new_text, !new_text.is_empty());
 
-        // Selection update.
+        // `new_selected_range_utf16` is relative to `new_text` (the composition
+        // string), per the GPUI EntityInputHandler contract. Convert the UTF-16
+        // offsets against the raw composition text, then offset by target.start.
         if let Some(new_sel_utf16) = new_selected_range_utf16 {
-            let absolute_utf8 = (
-                self.state.utf16_to_utf8(new_sel_utf16.start) + target.start,
-                self.state.utf16_to_utf8(new_sel_utf16.end) + target.start,
+            let local_utf8_start = crate::utf::utf16_offset_to_utf8(new_text, new_sel_utf16.start);
+            let local_utf8_end = crate::utf::utf16_offset_to_utf8(new_text, new_sel_utf16.end);
+            self.state.set_selection_range(
+                target.start + local_utf8_start,
+                target.start + local_utf8_end,
             );
-            self.state
-                .set_selection_range(absolute_utf8.0, absolute_utf8.1);
-        } else {
-            self.state.collapse_to(target.start + new_text.len());
         }
-        cx.notify();
+        self.after_mutation(cx);
     }
 
     fn bounds_for_range(

@@ -92,7 +92,9 @@ impl Selection {
         if self.anchor.is_none() {
             self.anchor = Some(self.head);
         }
-        let anchor = self.anchor.unwrap();
+        let Some(anchor) = self.anchor else {
+            return;
+        };
 
         // Fully collapse when offset matches both ends (true no-op).
         if offset == anchor && offset == self.head {
