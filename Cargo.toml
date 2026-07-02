@@ -1,6 +1,6 @@
 [package]
 name = "sqlly-textbox"
-version = "1.0.0"
+version = "1.1.1"
 edition = "2021"
 rust-version = "1.96"
 description = "A reusable, full-featured text input component for GPUI, supporting single-line, multi-line, validation, focus states, selection, IME, undo/redo, clipboard, and keyboard shortcuts."

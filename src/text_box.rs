@@ -216,6 +216,25 @@ impl TextBox {
         self
     }
 
+    /// Mark this field as a tab stop and place it at `index` in the window's
+    /// tab order. Equivalent to `.tab_stop(true).tab_index(index)` on the
+    /// underlying `FocusHandle`. Lower indices are visited first by Tab;
+    /// Shift+Tab reverses. Indices need not be contiguous.
+    #[must_use]
+    pub fn tab_index(mut self, index: isize) -> Self {
+        self.focus_handle = self.focus_handle.tab_stop(true).tab_index(index);
+        self
+    }
+
+    /// Toggle whether this field is reachable via Tab/Shift+Tab navigation.
+    /// `true` includes it in the tab order (at its current `tab_index`);
+    /// `false` removes it. Defaults to `false` (gpui's `FocusHandle` default).
+    #[must_use]
+    pub fn tab_stop(mut self, tab_stop: bool) -> Self {
+        self.focus_handle = self.focus_handle.tab_stop(tab_stop);
+        self
+    }
+
     #[must_use]
     pub fn read_only(mut self, read_only: bool) -> Self {
         self.state.set_read_only(read_only);
@@ -310,6 +329,14 @@ impl TextBox {
         self.state.set_text(text);
         self.run_sync_validation();
         self.after_mutation(cx);
+    }
+
+    /// Toggle the disabled state at runtime (mirrors the `.disabled(bool)`
+    /// builder). A disabled field rejects editing and renders with the
+    /// disabled style, but remains focusable. Notifies the view to repaint.
+    pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
+        self.state.set_disabled(disabled);
+        cx.notify();
     }
 
     pub fn set_validation(&mut self, state: ValidationState, cx: &mut Context<Self>) {

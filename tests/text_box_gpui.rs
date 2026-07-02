@@ -202,6 +202,78 @@ fn disabled_field_rejects_edits(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn tab_index_builder_marks_field_as_tab_stop(cx: &mut TestAppContext) {
+    let window = cx.add_window(|_w, cx| TextBox::new(cx).tab_index(7));
+    let (tab_stop, tab_index) = window
+        .update(cx, |input, _, _| {
+            let h = input.focus_handle_ref();
+            (h.tab_stop, h.tab_index)
+        })
+        .unwrap();
+    assert!(tab_stop, "tab_index() must set tab_stop=true");
+    assert_eq!(tab_index, 7, "tab_index() must record the index");
+}
+
+#[gpui::test]
+fn tab_stop_builder_can_disable_tab_navigation(cx: &mut TestAppContext) {
+    let window = cx.add_window(|_w, cx| TextBox::new(cx).tab_index(3).tab_stop(false));
+    let (tab_stop, tab_index) = window
+        .update(cx, |input, _, _| {
+            let h = input.focus_handle_ref();
+            (h.tab_stop, h.tab_index)
+        })
+        .unwrap();
+    assert!(!tab_stop, "tab_stop(false) must remove the field from tab order");
+    assert_eq!(tab_index, 3, "tab_index must persist after tab_stop(false)");
+}
+
+#[gpui::test]
+fn set_disabled_mutator_toggles_editability_at_runtime(cx: &mut TestAppContext) {
+    let window = cx.add_window(|_w, cx| TextBox::new(cx).value("v0"));
+    // Initially enabled: select-all + replace lands the new value.
+    window
+        .update(cx, |input, window, cx| {
+            input.select_all(&SelectAll, window, cx);
+            input.replace_text_in_range(None, "v1", window, cx);
+        })
+        .unwrap();
+    let after_edit = window
+        .update(cx, |input, _, _| input.text().to_string())
+        .unwrap();
+    assert_eq!(after_edit, "v1");
+
+    // Toggle disabled on at runtime.
+    window
+        .update(cx, |input, _, cx| input.set_disabled(true, cx))
+        .unwrap();
+    window
+        .update(cx, |input, window, cx| {
+            input.select_all(&SelectAll, window, cx);
+            input.replace_text_in_range(None, "v2", window, cx);
+        })
+        .unwrap();
+    let blocked = window
+        .update(cx, |input, _, _| input.text().to_string())
+        .unwrap();
+    assert_eq!(blocked, "v1", "set_disabled(true) must block edits");
+
+    // Toggle back off: edits flow again.
+    window
+        .update(cx, |input, _, cx| input.set_disabled(false, cx))
+        .unwrap();
+    window
+        .update(cx, |input, window, cx| {
+            input.select_all(&SelectAll, window, cx);
+            input.replace_text_in_range(None, "v3", window, cx);
+        })
+        .unwrap();
+    let reenabled = window
+        .update(cx, |input, _, _| input.text().to_string())
+        .unwrap();
+    assert_eq!(reenabled, "v3", "set_disabled(false) must restore edits");
+}
+
+#[gpui::test]
 fn read_only_blocks_mutation_but_allows_copy(cx: &mut TestAppContext) {
     let window = cx.add_window(|_w, cx| TextBox::new(cx).value("readme").read_only(true));
     window
