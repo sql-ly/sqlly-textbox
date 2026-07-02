@@ -16,6 +16,24 @@ cargo test --test text_box_gpui   # 12 GPUI integration tests
 cargo run --example demo          # tabbed feature showcase (Basics, Multi-line, …)
 ```
 
+## MANDATORY pre-push gate — NO EXCEPTIONS
+
+Under **no circumstance** may you commit, tag, or push without first running
+**both** of these commands to completion and confirming they succeed:
+
+```bash
+cargo fmt                            # format the code
+cargo clippy --all-targets -- -D warnings   # zero warnings, zero errors
+```
+
+- If `cargo fmt` changes **any** file, re-stage and re-commit those changes
+  before pushing. Never commit unformatted code.
+- If `cargo clippy` reports **any** warning or error (even one), STOP. Fix it
+  before proceeding. Do not push with clippy failures.
+- This gate applies to **every** push: version bumps, tiny edits, doc-only
+  changes, everything. No skipping, no "it's trivial", no exceptions.
+- Only after both pass clean may you proceed to bump the version, tag, and push.
+
 ## Layering
 
 - `state::TextBoxState` is GPUI-free. All text editing semantics live here.

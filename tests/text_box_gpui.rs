@@ -223,7 +223,10 @@ fn tab_stop_builder_can_disable_tab_navigation(cx: &mut TestAppContext) {
             (h.tab_stop, h.tab_index)
         })
         .unwrap();
-    assert!(!tab_stop, "tab_stop(false) must remove the field from tab order");
+    assert!(
+        !tab_stop,
+        "tab_stop(false) must remove the field from tab order"
+    );
     assert_eq!(tab_index, 3, "tab_index must persist after tab_stop(false)");
 }
 
